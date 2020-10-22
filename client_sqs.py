@@ -7,15 +7,38 @@ import progress
 
 class TimeoutException(Exception):
     pass
+class ParamException(Exception):
+    pass
 
 class Lab3 :
+    cmd_param = {
+        #for command send
+        '-s' : 'A',
+        'send' : 'A',
+        '--send' : 'A',
+        #for command help
+        '-h' : 'N',
+        'help' : 'N',
+        '--help' : 'N',
+        #for command timeout
+        '-t' : '1',
+        'timeout' : '1',
+        '--timeout' : '1',
+        #for command clear
+        '-c' : 'N',
+        'clear' : 'N',
+        '--clear' : 'N'
+    }
+
+
     def __init__(self):
         self.client = boto3.client('sqs')
         self.sqs = boto3.resource('sqs')
-        self.requestQueue = self.sqs.get_queue_by_name(QueueName='requestQueue')
-        self.responseQueue = self.sqs.get_queue_by_name(QueueName='responseQueue')
+        self.requestQueue = None
+        self.responseQueue = None
         self.rdm_id = 0
         self.timeOut = 10
+        self.create_queue()
 
     def help(self):
         print('*****HELP*****\nThere is 2 ways to execute and use the following commands :')
@@ -24,7 +47,7 @@ class Lab3 :
         print('Commands : ')
         print('-s      --send      send        |   Use this command to send numbers to the server                        | value : REQUIRED (set of numbers)')
         print('                                |   Example : -s 1 5 6 8')
-        print('-t      --timeOut   timeOut     |   Use this command to change the timeOut of the answer in second        | value : REQUIRED')
+        print('-t      --timeout   timeout     |   Use this command to change the timeOut of the answer in second        | value : REQUIRED')
         print('                                |   Example : -t 10')
         print('-c      --clear     clear       |   Use this command to clear the requestQueue and the reponseQueue')
         print('                                |   Example : -c')
@@ -32,6 +55,22 @@ class Lab3 :
         print('                                |   Example : -h')
         print('                    exit        |   Use this command to exit from the menu.')
 
+
+    def create_queue(self):
+        queues =  self.client.list_queues()
+        response_queue_created = False
+        request_queue_created = False
+        for url in queues['QueueUrls'] :
+            response_queue_created = response_queue_created or (url == 'responseQueue')
+            request_queue_created = request_queue_created or (url == 'requestQueue')
+            if(response_queue_created and request_queue_created) :
+                break
+        if (not response_queue_created) :
+            self.client.create_queue(QueueName='responseQueue')
+        if(not request_queue_created) :
+            self.client.create_queue(QueueName='requestQueue')
+        self.requestQueue = self.sqs.get_queue_by_name(QueueName='requestQueue')
+        self.responseQueue = self.sqs.get_queue_by_name(QueueName='responseQueue')
 
 
     def parse_response(self,content):
@@ -66,23 +105,10 @@ class Lab3 :
         return response
     
 
-
     def clear_queue(self) :
-        messages_to_remove = self.responseQueue.receive_messages()
-        i = 0
-        while(len(messages_to_remove)>0 or i < 10) :
-            i+=1
-            for m in self.responseQueue.receive_messages() :             
-                self.client.delete_message(QueueUrl = m.queue_url,ReceiptHandle = m.receipt_handle)
-            messages_to_remove = self.responseQueue.receive_messages()
-
-        messages_to_remove = self.requestQueue.receive_messages()
-        i = 0
-        while(len(messages_to_remove)>0 or i < 10) :
-            i+=1
-            for m in self.responseQueue.receive_messages() :             
-                self.client.delete_message(QueueUrl = m.queue_url,ReceiptHandle = m.receipt_handle)
-            messages_to_remove = self.requestQueue.receive_messages()
+        self.requestQueue.purge()
+        self.responseQueue.purge()
+        print("cleared")
         
 
     def send(self,values):
@@ -103,7 +129,6 @@ class Lab3 :
             print("time out")
 
         
-
     def change_parameter(self,name, value):
         msg = ''
         if name == '-h' or name == '--help' or name == 'help' :
@@ -113,7 +138,8 @@ class Lab3 :
         elif name == '-c' or name == '--clear' or name == 'clear' :
             self.clear_queue()
         elif name == '-t' or name == '--timeout' or name == 'timeout' :
-            self.timeOut = value
+            self.timeOut = int(value)
+            print("timeout change to "+str(self.timeOut))
         else :
             msg = 'The command '+name+' doesn''t exist, use -h or --help or help to get information on which command you can use'
         print(msg)
@@ -121,19 +147,43 @@ class Lab3 :
 
     def split_and_exec_commands_line(self,line):
         line_cmds = line if isinstance(line,list) else line.split(' ')
-        send_cmd = False
-        for index in range(0,len(line_cmds),2) :
-            name = line_cmds[index]
-            value = ''
-            if(index+1 < len(line_cmds)) :
-                value = line_cmds[index+1]
-                send_cmd = False
-                if(name == '-s' or name == '--send' or name == 'send'):
-                    value = line_cmds[index+1::1]
-                    send_cmd = True
-            self.change_parameter(name,value)
-            if send_cmd :
-                break
+        name = line_cmds[0]
+        values = None
+        try :
+            if(name in self.cmd_param.keys()) :
+                nb_param = self.cmd_param[name]
+            else :
+                raise ParamException(name+" doesn't exist.\nFeel free to use command -h or --help or help to get more information on which command you can use.")
+            if(nb_param == 'N'):
+                line_cmds.pop(0)
+            elif(nb_param.isdigit()) :
+                if(len(line_cmds)-1 >= int(nb_param)) :
+                    values = line_cmds[1:int(nb_param)+1]
+                    del line_cmds[0:int(nb_param)+1]
+                    if(int(nb_param) == 1):
+                        values = values[0]
+                else :
+                    raise ParamException(nb_param+" needed but only "+str(len(line_cmds)-1)+" available for command "+name+" in line "+line_cmds)
+            else :
+                #means everythong until next commands
+                if(len(line_cmds) >= 2) :
+                    max_idx = len(line_cmds)
+                    for cmd_name in self.cmd_param.keys() :
+                        if cmd_name in line_cmds[1:] :
+                            max_idx = min(max_idx,line_cmds.index(cmd_name))
+                    values = line_cmds[1:max_idx]
+                    del line_cmds[0:max_idx]
+                else :
+                    raise ParamException("At least one param needed but nothing found for command "+name+" in line "+line_cmds)
+        except ParamException as exp:
+            print("Error : "+exp.args[0])
+        else :
+            self.change_parameter(name,values)
+            if(len(line_cmds) > 0):
+                self.split_and_exec_commands_line(line_cmds)
+
+        
+
 
 
 #processing
@@ -142,7 +192,7 @@ def menu():
     print('Hello and welcome to the lab3 client program.')
     print('With this program, you can send a set of number to a server through SQS.')
     print('The program on the server side will collect them and make analysis on them. He will then send them back to you and your bucket.')
-    print('Feel free to use command -h or --help or help to get more information on which you can command you can use.')
+    print('Feel free to use command -h or --help or help to get more information on which command you can use.')
     print('To exit from this menu, please use the command "exit"')
     while (not quit) :
         line = input("")
