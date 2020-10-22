@@ -139,7 +139,7 @@ class Lab3 :
             self.clear_queue()
         elif name == '-t' or name == '--timeout' or name == 'timeout' :
             self.timeOut = int(value)
-            print("timeout change to "+str(self.timeOut))
+            print("Timeout change to "+str(self.timeOut))
         else :
             msg = 'The command '+name+' doesn''t exist, use -h or --help or help to get information on which command you can use'
         print(msg)
@@ -195,11 +195,15 @@ def menu():
     print('Feel free to use command -h or --help or help to get more information on which command you can use.')
     print('To exit from this menu, please use the command "exit"')
     while (not quit) :
-        line = input("")
-        if line == "exit" :
-            quit = True
-        else:
-            lab3.split_and_exec_commands_line(line)
+        try:
+            line = input("")
+            if line == "exit" :
+                quit = True
+            else:
+                lab3.split_and_exec_commands_line(line)
+        except Exception as e:
+            print(e)
+        
 
 lab3 = Lab3()
 if(len(sys.argv) > 1) :
