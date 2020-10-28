@@ -1,4 +1,5 @@
 import boto3
+import os
 import sys
 import time
 import random
@@ -35,10 +36,18 @@ class Lab3 :
     # > 'N' means no param needed.
     # > '1' means 1 param needed.
     cmd_param = {
-        # For command send.
+        # For command send number get result.
         '-s' : 'A',
         'send' : 'A',
         '--send' : 'A',
+        # For command greyScale.
+        '-n' : '2',
+        'nvg' : '2',
+        '--nvg' : '2',
+        # For command threshold.
+        '-thl' : '2',
+        'threshold' : '2',
+        '--threshold' : '2',
         # For command help.
         '-h' : 'N',
         'help' : 'N',
@@ -59,9 +68,12 @@ class Lab3 :
         self.sqs = boto3.resource('sqs') # Init sqs : used to get SQS queue by the url/name.
         self.request_queue = None # Queue used to send request to server.
         self.response_queue = None # Queue used to get answer from the server.
+        self.bucket_client = boto3.client('s3')# Init bucket_client : used to list ,create bucket and uploading log files. 
+        self.bucket = "logbucketa215sc487hgjdfi" #Bucket name where logs files will be stocked and images retrieves.
         self.rdm_id = 0 # Random ID that will be used to link the request with the answer.
         self.time_out = 10 # Time out when waiting the answer from the server.
         self.create_queue() # Init of requestQueue and responseQueue.
+        self.init_bucket()
 
     # Display help.
     def help(self):
@@ -69,14 +81,28 @@ class Lab3 :
         print('> Directly with the prompt : lab3_client [command] [value] [command] [value]')
         print('> Enter in the program with the command : lab3_client  then using the set [command] [value] \n\n')
         print('Commands : ')
-        print('-s      --send      send        |   Use this command to send numbers to the server                        | value : REQUIRED (set of numbers)')
+        print('-s      --send      send        |   Use this command to send numbers to the server and get back calculation on these') 
+        print('                                |   Value : REQUIRED (set of numbers)')
         print('                                |   Example : -s 1 5 6 8')
-        print('-t      --timeout   timeout     |   Use this command to change the TimeOut of the answer in second        | value : REQUIRED')
+        print('---')
+        print('-n      --nvg       nvg         |   Use this command to ask the server to make a greyScale on an image from a bucket (can find the modified image in the same bucket )')
+        print('                                |   Value : REQUIRED image_path_on_computer image_transformed_on_bucket')
+        print('                                |   Example : --nvg small_image_color.png small_image_greyScale.png')
+        print('---')
+        print('-thl  --threshold   threshold   |   Use this command to ask the server to make a threshold on an image from a bucket (can find the modified image in the same bucket)')
+        print('                                |   Value : REQUIRED image_path_on_computer image_transformed_on_bucket')
+        print('                                |   Example : -thl small_image_greyScale.png small_image_binary.png')
+        print('---')
+        print('-t      --timeout   timeout     |   Use this command to change the TimeOut of the answer in second')
+        print('                                |   Value : REQUIRED time in second ')
         print('                                |   Example : -t 10')
+        print('---')
         print('-c      --clear     clear       |   Use this command to clear the requestQueue and the reponseQueue')
         print('                                |   Example : -c')
+        print('---')
         print('-h      --help      help        |   Use this command to display help (but i guess you get it since you are on the help display).')
         print('                                |   Example : -h')
+        print('---')
         print('                    exit        |   Use this command to exit from the menu.')
 
 
@@ -98,6 +124,21 @@ class Lab3 :
             self.client.create_queue(QueueName='requestQueue')
         self.request_queue = self.sqs.get_queue_by_name(QueueName='requestQueue')
         self.response_queue = self.sqs.get_queue_by_name(QueueName='responseQueue')
+
+
+    # Function init_bucket
+    # Test if bucket log_bucket already exists.
+    # If it doesn't, it will create it.
+    def init_bucket(self):
+        buckets = self.bucket_client.list_buckets()
+        bucket_created = False
+        for bucket in buckets['Buckets']:
+            if(bucket["Name"] == self.bucket) :
+                bucket_created = True
+                break
+        if(not bucket_created):
+            self.bucket_client.create_bucket(Bucket=self.bucket)
+
 
     # Function clear_queue
     # Remove everything (purge) from SQS queue request_queue and reponse_queue.
@@ -170,16 +211,26 @@ class Lab3 :
     # This function will send values then wait for the answer from the server
     # PARAM |
     # values : an number array with the values to send to the server.
-    def send(self,values):
+    # cmd [REQUIRED]: the command (string) to send in the metadata.
+    # EXAMPLE |
+    # self.send([1 2 3],"-calc")
+    def send(self,values,cmd):
+
         # Create a string with the array : [1 2 3]=>"1 2 3".
-        request = ' '.join(map(str, values))
+        if isinstance(values, list) :
+            request = ' '.join(map(str, values))
         # Create and add a random ID to the request. It will be used to get the good response message (with the same ID) from response_queue.
         self.rdm_id = int(random.random()*10000)
         self.request_queue.send_message(MessageBody = request,MessageAttributes={
         'ID': {
             'StringValue': str(self.rdm_id),
             'DataType': 'String'
-        }})
+        },
+        'cmd': {
+            'StringValue': cmd,
+            'DataType': 'String'
+        }
+        })
         print(OKGREEN+'Information send'+ENDC)
 
         # Try to get the answer from the server until the result is out or the time is out.
@@ -190,7 +241,34 @@ class Lab3 :
         except TimeoutException:
             print(FAIL+"TIME OUT\nIf you want to change the the time out value, use command ""-t value"""+ENDC)
 
-        
+    
+
+    def save_file_to_bucket(self,filename,dst_file = ""):
+        dst_file = filename if dst_file == "" else dst_file
+        self.bucket_client.upload_file(filename,self.bucket,dst_file)
+    
+    def get_check_paths_param(self,line,nbr_needed):
+        paths = line.split(' ')
+        if(len(paths) != nbr_needed):
+            raise ParamException("Number of params isn't correct, needed: "+nbr_needed+" | found "+len(paths)+" for cmd line "+line)
+        if("" in paths ) :
+            raise ParamException("One of the param is null for " + str(paths))
+        return paths
+
+
+    def image_proc(self,paths,line):
+        # Upload temp image on bucket
+        temp_path = paths[1]+".temp"
+        if os.path.exists(paths[0]) :
+            self.save_file_to_bucket(paths[0],temp_path)
+        else :
+            raise ParamException("The file "+paths[0]+" doesn't exist.")
+        value = [temp_path,paths[1]]
+        self.send(value,line)
+        self.bucket_client.delete_object(Bucket=self.bucket,Key=temp_path)
+         
+
+
     # Function change_parameter
     # PARAM |
     # name : string which represent the command to do.
@@ -204,12 +282,16 @@ class Lab3 :
         if name == '-h' or name == '--help' or name == 'help' :
             self.help()
         elif name == '-s' or name == '--send' or name == 'send' :
-            self.send(value)
+            self.send(value,"-calc")
         elif name == '-c' or name == '--clear' or name == 'clear' :
             self.clear_queue()
         elif name == '-t' or name == '--timeout' or name == 'timeout' :
             self.time_out = int(value)
             print("Timeout change to "+str(self.time_out))
+        elif name == '-thl' or name == '--threshold' or name == 'threshold' :
+            self.image_proc(value,"-thr")
+        elif name == '-n' or name == '--nvg' or name == 'nvg' :
+            self.image_proc(value,"-nvg")
         else :
             msg = 'The command '+name+' doesn''t exist, use -h or --help or help to get information on which command you can use'
             print(FAIL+msg+ENDC)
@@ -292,6 +374,7 @@ def menu():
                 quit = True
             else:
                 lab3.split_and_exec_commands_line(line)
+                input("Click on any key")
         except Exception as e:
             print(FAIL)
             print(e)
