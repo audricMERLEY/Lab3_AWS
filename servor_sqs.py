@@ -34,7 +34,7 @@ class Worker :
         self.sqs = boto3.resource('sqs',region_name="us-east-1") # Init sqs : used to get SQS queue by the url/name.
         self.request_queue = None # Queue used to send request to server.
         self.response_queue = None # Queue used to get answer from the server.
-        self.bucket = "logbucketa215sc487hgjdfi" #Bucket name where logs files will be stocked and images retrieves.
+        self.bucket = "" #Bucket name where logs files will be stocked and images retrieves.
         self.init_queues() # Init of requestQueue and responseQueue.
         self.init_bucket()
 
@@ -64,6 +64,9 @@ class Worker :
     # Test if bucket log_bucket already exists.
     # If it doesn't, it will create it.
     def init_bucket(self):
+        with open("configure.txt",'r') as myFile:
+            self.bucket = myFile.readline().strip()
+
         buckets = self.bucket_client.list_buckets()
         bucket_created = False
         for bucket in buckets['Buckets']:

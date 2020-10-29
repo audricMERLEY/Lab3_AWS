@@ -1,6 +1,7 @@
 import sys
 from paramiko import *
 import os
+
 # Connection by ssh to the vm
 class ConfigManager: 
     def __init__(self):
@@ -37,7 +38,7 @@ class ConfigManager:
         sftp = self.ssh_client.open_sftp()
         sftp.put(src_path,dest_path)
         sftp.close()
-        
+
 
     def handle_python(self):
         # install for working with python script

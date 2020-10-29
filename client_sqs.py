@@ -59,7 +59,11 @@ class Lab3 :
         # For command clear.
         '-c' : 'N',
         'clear' : 'N',
-        '--clear' : 'N'
+        '--clear' : 'N',
+        # For command bucket.
+        '-b' : '1',
+        'bucket' : '1',
+        '--bucket' : '1'
     }
 
 
@@ -69,7 +73,7 @@ class Lab3 :
         self.request_queue = None # Queue used to send request to server.
         self.response_queue = None # Queue used to get answer from the server.
         self.bucket_client = boto3.client('s3')# Init bucket_client : used to list ,create bucket and uploading log files. 
-        self.bucket = "logbucketa215sc487hgjdfi" #Bucket name where logs files will be stocked and images retrieves.
+        self.bucket = "" #Bucket name where logs files will be stocked and images retrieves.
         self.rdm_id = 0 # Random ID that will be used to link the request with the answer.
         self.time_out = 10 # Time out when waiting the answer from the server.
         self.create_queue() # Init of requestQueue and responseQueue.
@@ -99,6 +103,9 @@ class Lab3 :
         print('---')
         print('-c      --clear     clear       |   Use this command to clear the requestQueue and the reponseQueue')
         print('                                |   Example : -c')
+        print('---')
+        print('-b      --bucket    bucket      |   Use this command to change name of bucket')
+        print('                                |   Example : -b bucketlog145879')
         print('---')
         print('-h      --help      help        |   Use this command to display help (but i guess you get it since you are on the help display).')
         print('                                |   Example : -h')
@@ -130,7 +137,10 @@ class Lab3 :
     # Function init_bucket
     # Test if bucket log_bucket already exists.
     # If it doesn't, it will create it.
-    def init_bucket(self):
+    def init_bucket(self,force = False):
+        if(not force):
+            with open("configure.txt",'r') as myFile:
+                self.bucket = myFile.readline().replace('\n',' ')
         buckets = self.bucket_client.list_buckets()
         bucket_created = False
         for bucket in buckets['Buckets']:
@@ -293,6 +303,9 @@ class Lab3 :
             self.image_proc(value,"-thr")
         elif name == '-n' or name == '--nvg' or name == 'nvg' :
             self.image_proc(value,"-nvg")
+        elif name == '-b' or name == '--bucket' or name == 'bucket' :
+            self.bucket = value
+            self.init_bucket(True)
         else :
             msg = 'The command '+name+' doesn''t exist, use -h or --help or help to get information on which command you can use'
             print(FAIL+msg+ENDC)
