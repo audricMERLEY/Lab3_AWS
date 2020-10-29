@@ -22,7 +22,7 @@ We successfully did it except for one thing: when configurating the AWS-cli on t
  
 ## Requirement
 
-You need to install python3 (check python3 –version) and aws-cli/2. (aws –version)
+You need to install Python3 (check python3 –version) and aws-cli/2. (aws –version)
 
 Libraries needed:
 
