@@ -3,7 +3,7 @@ import sys
 import string
 import random
 
-
+# used to generate a random name for the bucket
 def generate_random_bucket():
     bucket_name ="bucketlog"+''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))
     with open("configure.txt","w") as myFile:
@@ -22,6 +22,7 @@ password = ""
 port = 22
 hostname = ""
 if(len(sys.argv) > 1) :
+    # need the hostname to connect with SSH
     hostname = sys.argv[1]
     ssh_client = SSHClient()
     key = RSAKey.from_private_key_file("lab3KeyPair.pem")
@@ -32,8 +33,10 @@ if(len(sys.argv) > 1) :
     ssh_client.exec_command("echo \""+str(generate_random_bucket())+"\" > configure.txt")
     stdin, stdout, stderr = ssh_client.exec_command("cat configure.txt")
     print(str(stdout.read()))
+    # Launch servor_sqs
     stdin, stdout, stderr = ssh_client.exec_command("python3 servor_sqs.py",get_pty=True)
     while True:
+        # print output of the servor in real time
         print(stdout.readline())
         if stdout.channel.exit_status_ready():
             break
