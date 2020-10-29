@@ -1,0 +1,1 @@
+start cmd.exe /k launcher_manager.bat %1

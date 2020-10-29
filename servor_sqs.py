@@ -13,6 +13,7 @@ import statistics
 from datetime import datetime
 from PIL import Image
 
+
 #Exception raised when there will be problems with params : not the good number, a letter instead of a number,...
 class ParamException(Exception):
     pass
@@ -28,9 +29,9 @@ class Worker :
 
 
     def __init__(self):
-        self.sqs_client = boto3.client('sqs') # Init sqs_client : used to list ,create SQS queue and delete messages. 
-        self.bucket_client = boto3.client('s3')# Init bucket_client : used to list ,create bucket and uploading log files. 
-        self.sqs = boto3.resource('sqs') # Init sqs : used to get SQS queue by the url/name.
+        self.sqs_client = boto3.client('sqs',region_name="us-east-1") # Init sqs_client : used to list ,create SQS queue and delete messages. 
+        self.bucket_client = boto3.client('s3',region_name="us-east-1")# Init bucket_client : used to list ,create bucket and uploading log files. 
+        self.sqs = boto3.resource('sqs',region_name="us-east-1") # Init sqs : used to get SQS queue by the url/name.
         self.request_queue = None # Queue used to send request to server.
         self.response_queue = None # Queue used to get answer from the server.
         self.bucket = "logbucketa215sc487hgjdfi" #Bucket name where logs files will be stocked and images retrieves.
@@ -42,14 +43,15 @@ class Worker :
     # Test if SQS queues requestQueue and responseQueue already exist.
     # If they don't, it will create them.
     def init_queues(self):
-        queues =  self.sqs_client.list_queues()
+        queues =  self.sqs_client.list_queues(QueueNamePrefix='re')
         response_queue_created = False
         request_queue_created = False
-        for url in queues['QueueUrls'] :
-            response_queue_created = response_queue_created or (url == 'responseQueue')
-            request_queue_created = request_queue_created or (url == 'requestQueue')
-            if(response_queue_created and request_queue_created) :
-                break
+        if("QueueUrls" in queues):
+            for url in queues['QueueUrls'] :
+                response_queue_created = response_queue_created or (url == 'responseQueue')
+                request_queue_created = request_queue_created or (url == 'requestQueue')
+                if(response_queue_created and request_queue_created) :
+                    break
         if (not response_queue_created) :
             self.sqs_client.create_queue(QueueName='responseQueue')
         if(not request_queue_created) :
@@ -283,4 +285,5 @@ class Worker :
 
 #Processing :
 worker = Worker()
+print("HELLO")
 worker.receive_worker()

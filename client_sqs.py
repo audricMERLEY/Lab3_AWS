@@ -110,14 +110,15 @@ class Lab3 :
     # Test if SQS queues requestQueue and responseQueue already exist.
     # If they don't, it will create them.
     def create_queue(self):
-        queues =  self.client.list_queues()
+        queues =  self.client.list_queues(QueueNamePrefix='re')
         response_queue_created = False
         request_queue_created = False
-        for url in queues['QueueUrls'] :
-            response_queue_created = response_queue_created or (url == 'responseQueue')
-            request_queue_created = request_queue_created or (url == 'requestQueue')
-            if(response_queue_created and request_queue_created) :
-                break
+        if("QueueUrls" in queues):
+            for url in queues['QueueUrls'] :
+                response_queue_created = response_queue_created or (url == 'responseQueue')
+                request_queue_created = request_queue_created or (url == 'requestQueue')
+                if(response_queue_created and request_queue_created) :
+                    break
         if (not response_queue_created) :
             self.client.create_queue(QueueName='responseQueue')
         if(not request_queue_created) :
