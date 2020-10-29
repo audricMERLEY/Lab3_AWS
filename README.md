@@ -1,5 +1,7 @@
+Pierre GIRAUD - Richard DROGO - Cédric GORMOND - Arnaud TAVERNIER - Audric MERLEY
 
-# Project LAB3
+
+# Project LAB3 TEAM 8
 
  
 ## Context
