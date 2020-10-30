@@ -1,3 +1,4 @@
+# source : https://gist.github.com/greenstick/b23e475d2bfdc3a82e34eaa1f6781ee4
 # Print iterations progress
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
     """
